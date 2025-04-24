@@ -1,6 +1,7 @@
 import '../App.css'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import AnimatedBackground from './AnimatedBackground'
 
 function Register({ onBackToLogin }: { onBackToLogin: () => void }) {
   const [email, setEmail] = useState('')
@@ -90,87 +91,98 @@ function Register({ onBackToLogin }: { onBackToLogin: () => void }) {
   }
 
   return (
-    <>
-      <div className="w-[100vw] h-[100vh] flex flex-col items-center justify-center bg-gray-900">
-        <div className="w-[30vw] h-[80vh] flex flex-col items-center justify-evenly bg-gray-800 p-4 rounded-lg shadow-lg">
+    <div className="w-[100vw] h-[100vh] flex flex-col items-center justify-center">
+      {/* Fond animé */}
+      <AnimatedBackground />
+      
+      <div className="w-[30vw] min-w-[350px] h-[50vh] min-h-[450px] flex flex-col items-center justify-evenly auth-container p-8 bg-purple-900/40">
+        {/* Box Title */}
+        <div className="mb-6 text-center"> 
+          <h1 className="text-white text-4xl font-bold">ChatBox Register</h1>
+        </div>
 
-          {/* Box Title */}
-          <div className="w-[15vw] h-[5vh] flex items-center justify-center bg-gray-700 rounded-lg shadow-md"> 
-            <h1 className="text-white text-4xl font-bold">Register</h1>
+        {error && (
+          <div className="p-3 mb-4 bg-rose-700/80 text-white rounded-lg text-center">
+            {error} 
           </div>
+        )}
 
-          {error && (
-            <div className="w-[80%] p-2 bg-rose-700 text-white rounded-lg text-center">
-              {error}
-            </div>
-          )}
-
+        <form className='w-[auto] h-[35vh] flex flex-col items-center justify-around'onSubmit={handleRegister}>
           {/* Box Email */}
-          <div className="w-[80%] h-[15vh] flex flex-col items-center justify-evenly bg-gray-700 rounded-lg shadow-md">
-            <h2 className='text-white text-2xl font-bold'>Email</h2>
-            <input 
+          <div className="flex flex-col items-center justify-evenly mb-6">
+            <label htmlFor="email" className="block text-white text-xl font-bold mb-2">Email</label>
+            <input
+              id="email"  
               type="email" 
               placeholder="Enter your email" 
-              className="mt-2 p-2 rounded bg-gray-200 text-black"
+              className="w-full p-3 rounded-lg auth-input focus:outline-none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           {/* Box Username */}
-          <div className="w-[80%] h-[15vh] flex flex-col items-center justify-evenly bg-gray-700 rounded-lg shadow-md">
-            <h2 className='text-white text-2xl font-bold'>Username</h2>
-            <input 
+          <div className="flex flex-col items-center justify-evenly mb-6">
+            <label htmlFor="username" className="block text-white text-xl font-bold mb-2">Username</label>
+            <input
+              id="username"  
               type="text" 
               placeholder="Choose a username" 
-              className="mt-2 p-2 rounded bg-gray-200 text-black"
+              className="w-full p-3 rounded-lg auth-input focus:outline-none"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
           </div>
 
           {/* Box Password */}
-          <div className="w-[80%] h-[15vh] flex flex-col items-center justify-evenly bg-gray-700 rounded-lg shadow-md">
-            <h2 className='text-white text-2xl font-bold'>Password</h2>
-            <input 
+          <div className="flex flex-col items-center justify-evenly mb-6">
+            <label htmlFor="password" className="block text-white text-xl font-bold mb-2">Password</label>
+            <input
+              id="password" 
               type="password" 
-              placeholder='*******' 
-              className="mt-2 p-2 rounded bg-gray-200 text-black"
+              placeholder="*******" 
+              className="w-full p-3 rounded-lg auth-input focus:outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
 
           {/* Box Confirm Password */}
-          <div className="w-[80%] h-[15vh] flex flex-col items-center justify-evenly bg-gray-700 rounded-lg shadow-md">
-            <h2 className='text-white text-2xl font-bold'>Confirm Password</h2>
-            <input 
+          <div className="flex flex-col items-center justify-evenly mb-6">
+            <label htmlFor="confirmPassword" className="block text-white text-xl font-bold mb-2">Confirm Password</label>
+            <input
+              id="confirmPassword" 
               type="password" 
-              placeholder='*******' 
-              className="mt-2 p-2 rounded bg-gray-200 text-black"
+              placeholder="*******" 
+              className="w-full p-3 rounded-lg auth-input focus:outline-none"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
           </div>
 
-          {/* Registration Button */}
+          {/* Register Button */}
           <button 
-            onClick={handleRegister}
+            type="submit"
             disabled={!isFormValid || loading}
-            className={`w-[40%] py-2 text-white font-bold rounded-lg cursor-not-allowed transition duration-300 ${
-              isFormValid ? 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer' : 'bg-rose-600 hover:bg-rose-700'
-            }`}>
+            className="w-full p-3 rounded-lg font-bold text-white auth-button"
+          >
             {loading ? 'Registering...' : 'Register'}
           </button>
+          
+        </form>
 
-          {/* Back to Login */}
-          <div className='w-[45%] h-[3vh] flex items-center justify-center bg-gray-800 rounded-lg shadow-md'>
-            <h3 className='text-white font-bold'>Already have an account ? </h3> &nbsp;
-            <button onClick={onBackToLogin} className="mt-2 p-2 rounded text-white cursor-pointer">Login</button>
-          </div>
+        {/* Back to Login */}
+        <div className="mt-6 text-center text-white">
+          <span className="font-bold">Already have an account ? </span> 
+          <button 
+            onClick={onBackToLogin} 
+            className="ml-2 auth-link p-1 cursor-pointer rounded"
+          >
+            Login
+          </button>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
