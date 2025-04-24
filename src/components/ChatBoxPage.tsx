@@ -23,7 +23,6 @@ interface Channel {
 
 function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const [user, setUser] = useState<User | null>(null)
-  const [authenticated, setAuthenticated] = useState<boolean>(false)
   const [showProfileSettings, setShowProfileSettings] = useState(false)
   const [displayName, setDisplayName] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -55,7 +54,6 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       }
       
       setUser(data.user)
-      setAuthenticated(true)
       
       if (data.user?.user_metadata?.display_name) {
         setDisplayName(data.user.user_metadata.display_name)
@@ -67,11 +65,9 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === 'SIGNED_OUT') {
-          setAuthenticated(false)
           onLogout()
         } else if (session) {
           setUser(session.user)
-          setAuthenticated(true)
           if (session.user?.user_metadata?.display_name) {
             setDisplayName(session.user.user_metadata.display_name)
           }
@@ -210,7 +206,7 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       const lastTime = parseInt(window.localStorage.getItem('lastMessageTime') || '0');
       const currentTime = Date.now();
       if (currentTime - lastTime < 500) { // 500ms de délai minimum entre messages
-        alert("Vous envoyez des messages trop rapidement");
+        alert("Vous envoyez des messages trop rapidement")
         return;
       }
     }
