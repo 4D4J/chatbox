@@ -21,12 +21,6 @@ interface Channel {
   name: string
 }
 
-// Interface pour les informations de bannissement
-interface BanInfo {
-  isBanned: boolean;
-  expiresAt?: string;
-}
-
 function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const [user, setUser] = useState<User | null>(null)
   const [showProfileSettings, setShowProfileSettings] = useState(false)
@@ -35,7 +29,6 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const [newPassword, setNewPassword] = useState('')
   const [updateMessage, setUpdateMessage] = useState<{text: string, isError: boolean} | null>(null)
   const [loading, setLoading] = useState(false)
-  
   
   // État pour la gestion des messages et des canaux
   const [messages, setMessages] = useState<Message[]>([])
@@ -48,16 +41,12 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const [activeChannel, setActiveChannel] = useState<number>(1)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [connectedUsers, setConnectedUsers] = useState<number>(1)
-
-  // État pour gérer le bannissement
-  const [banInfo, setBanInfo] = useState<BanInfo>({ isBanned: false });
   
   useEffect(() => {
     const getCurrentUser = async () => {
       const { data, error } = await supabase.auth.getUser()
       
       if (error || !data.user) {
-        
         console.error("Erreur d'authentification:", error)
         onLogout()
         return
@@ -92,7 +81,6 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
     }
   }, [onLogout])
 
-  
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -102,7 +90,6 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   }, [messages])
 
   useEffect(() => {
-    
     const getWelcomeMessage = (channelId: number): Message => {
       return {
         id: channelId,
@@ -117,10 +104,8 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
         user: { email: 'system@example.com', user_metadata: { display_name: 'Système' } }
       };
     };
-
     
     setMessages([getWelcomeMessage(activeChannel)]);
-
   
     const subscription = supabase
       .channel(`temp_messages:channel_id=eq.${activeChannel}`)
@@ -135,12 +120,10 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       })
       .subscribe();
     
-    
     return () => {
       subscription.unsubscribe();
     };
   }, [activeChannel]);
-
   
   useEffect(() => {
     const presenceChannel = supabase.channel('online-users', {
@@ -170,44 +153,9 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
     };
   }, [user]);
 
-  // Ajouter un timer pour nettoyer les messages expirés côté client et pour la sécurité
-  useEffect(() => {
-    // Fonction pour filtrer les messages expirés (plus vieux qu'une heure)
-    const filterExpiredMessages = () => {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      
-      setMessages(prevMessages => 
-        prevMessages.filter(msg => {
-          // Garder toujours le message système de bienvenue
-          if (msg.user_id === 'system') return true;
-          
-          // Filtrer les autres messages selon leur date de création
-          const messageDate = new Date(msg.created_at);
-          return messageDate > oneHourAgo;
-        })
-      );
-    };
-
-    // Exécuter le nettoyage toutes les minutes
-    const cleanupInterval = setInterval(filterExpiredMessages, 60 * 1000);
-    
-    // Exécuter une fois au démarrage
-    filterExpiredMessages();
-    
-    // Nettoyer l'intervalle lors du démontage du composant
-    return () => clearInterval(cleanupInterval);
-  }, [activeChannel]);
-  
   // Ajouter la validation et assainissement des messages avant envoi
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !user) return;
-    
-    // Vérifier si l'utilisateur est banni
-    if (banInfo.isBanned) {
-      const expiresDate = banInfo.expiresAt ? new Date(banInfo.expiresAt).toLocaleString() : 'date inconnue';
-      alert(`Vous ne pouvez pas envoyer de messages car vous êtes banni jusqu'au ${expiresDate}`);
-      return;
-    }
     
     // Validation de base et assainissement
     const trimmedMessage = inputMessage.trim();
@@ -349,7 +297,6 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
     }
   }
 
-
   const sanitizeContent = (content: string): string => {
     return content
       .replace(/&/g, '&amp;')
@@ -358,56 +305,6 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
-
-  // Fonction pour vérifier si l'utilisateur est banni
-  useEffect(() => {
-    // Vérifier si l'utilisateur est banni à chaque chargement
-    const checkUserBanStatus = async () => {
-      if (!user) return;
-      
-      try {
-        // Appeler la fonction RPC pour vérifier si l'utilisateur est banni
-        const { data, error } = await supabase.rpc('is_user_banned', {
-          check_user_id: user.id
-        });
-        
-        if (error) {
-          console.error("Erreur lors de la vérification du statut de bannissement:", error);
-          return;
-        }
-        
-        // Si l'utilisateur est banni, récupérer les détails
-        if (data === true) {
-          const { data: banData, error: banError } = await supabase
-            .from('banned_users')
-            .select('ban_expires_at, reason')
-            .eq('user_id', user.id)
-            .single();
-            
-          if (banError) {
-            console.error("Erreur lors de la récupération des détails du bannissement:", banError);
-            return;
-          }
-          
-          if (banData) {
-            setBanInfo({
-              isBanned: true,
-              expiresAt: banData.ban_expires_at
-            });
-            
-            // Afficher un message à l'utilisateur
-            alert(`Vous êtes banni pour spam jusqu'au ${new Date(banData.ban_expires_at).toLocaleString()}. Vous ne pourrez pas envoyer de messages pendant cette période.`);
-          }
-        } else {
-          setBanInfo({ isBanned: false });
-        }
-      } catch (err) {
-        console.error("Erreur inattendue:", err);
-      }
-    };
-    
-    checkUserBanStatus();
-  }, [user]);
 
   return (
     <div className="w-[100vw] h-[100vh] flex flex-col bg-gray-900">
@@ -453,10 +350,6 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
                   <p className="text-green-400">
                     <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-2"></span>
                     {connectedUsers} utilisateur{connectedUsers > 1 ? 's' : ''} en ligne
-                  </p>
-                  <p className="text-gray-400 text-sm mt-2">
-                    <span className="inline-block w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>
-                    Les messages sont effacés toutes les heures
                   </p>
                 </div>
             </div>
