@@ -281,27 +281,33 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
     
-    // Envoyer le message via Supabase Realtime
-    const { error } = await supabase
-      .from('temp_messages')
-      .insert({
-        user_id: user.id,
-        channel_id: activeChannel,
-        content: sanitizedMessage,
-        display_name: senderName
-      });
-    
-    if (error) {
-      // Si l'erreur est liée au bannissement
-      if (error.code === '42501') {
-        alert("Vous êtes banni et ne pouvez pas envoyer de messages.");
-        
-        // Mettre à jour le statut de bannissement côté client
-        setBanInfo({ isBanned: true });
-      } else {
-        console.error('Error sending message:', error);
-        alert("Erreur lors de l'envoi du message");
+    // Envoyer le message via Supabase Realtime - SIMPLIFIÉ sans champs additionnels problématiques
+    try {
+      const { error } = await supabase
+        .from('temp_messages')
+        .insert({
+          user_id: user.id,
+          channel_id: activeChannel,
+          content: sanitizedMessage,
+          display_name: senderName
+          // Laisser le système gérer created_at et expires_at avec les valeurs par défaut
+        });
+      
+      if (error) {
+        // Si l'erreur est liée au bannissement
+        if (error.code === '42501') {
+          alert("Vous êtes banni et ne pouvez pas envoyer de messages.");
+          
+          // Mettre à jour le statut de bannissement côté client
+          setBanInfo({ isBanned: true });
+        } else {
+          console.error('Error sending message:', error);
+          alert(`Erreur lors de l'envoi du message: ${error.message}`);
+        }
       }
+    } catch (err) {
+      console.error("Erreur inattendue lors de l'envoi du message:", err);
+      alert("Une erreur inattendue s'est produite lors de l'envoi du message.");
     }
     
     // Réinitialiser le champ de saisie
