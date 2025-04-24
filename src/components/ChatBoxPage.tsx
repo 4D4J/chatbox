@@ -21,6 +21,12 @@ interface Channel {
   name: string
 }
 
+// Interface pour les informations de bannissement
+interface BanInfo {
+  isBanned: boolean;
+  expiresAt?: string;
+}
+
 function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const [user, setUser] = useState<User | null>(null)
   const [showProfileSettings, setShowProfileSettings] = useState(false)
@@ -42,6 +48,16 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [connectedUsers, setConnectedUsers] = useState<number>(1)
 
+  // État pour gérer le bannissement
+  const [banInfo, setBanInfo] = useState<BanInfo>({ isBanned: false });
+  const messageCountRef = useRef<number>(0);
+  const lastMessageTimeRef = useRef<number>(Date.now());
+  
+  // Constantes pour la détection de spam
+  const MAX_MESSAGES_ALLOWED = 5; // Maximum de messages consécutifs rapides
+  const TIME_WINDOW_MS = 5000; // Fenêtre de temps pour considérer comme spam (5 secondes)
+  const COOLDOWN_PERIOD_MS = 30000; // Période de réinitialisation du compteur (30 secondes)
+  
   useEffect(() => {
     const getCurrentUser = async () => {
       const { data, error } = await supabase.auth.getUser()
@@ -110,7 +126,7 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
 
     
     setMessages([getWelcomeMessage(activeChannel)]);
-    
+
   
     const subscription = supabase
       .channel(`temp_messages:channel_id=eq.${activeChannel}`)
@@ -192,6 +208,13 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !user) return;
     
+    // Vérification si l'utilisateur est banni
+    if (banInfo.isBanned) {
+      const expiration = banInfo.expiresAt ? new Date(banInfo.expiresAt).toLocaleString() : "date inconnue";
+      alert(`Vous êtes banni jusqu'au ${expiration}. Vous ne pouvez pas envoyer de messages.`);
+      return;
+    }
+    
     // Validation de sécurité pour les messages
     const trimmedMessage = inputMessage.trim();
     
@@ -201,16 +224,55 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       return;
     }
     
-    // Protection contre l'envoi trop rapide (anti-spam)
-    if (window.localStorage.getItem('lastMessageTime')) {
-      const lastTime = parseInt(window.localStorage.getItem('lastMessageTime') || '0');
-      const currentTime = Date.now();
-      if (currentTime - lastTime < 500) { // 500ms de délai minimum entre messages
-        alert("Vous envoyez des messages trop rapidement")
-        return;
+    // Détection de spam avec bannissement
+    const currentTime = Date.now();
+    const timeSinceLastMessage = currentTime - lastMessageTimeRef.current;
+    
+    // Si le message est envoyé rapidement (dans la fenêtre de temps)
+    if (timeSinceLastMessage < TIME_WINDOW_MS) {
+      // Incrémente le compteur de messages rapides
+      messageCountRef.current += 1;
+      
+      // Si le nombre de messages dépasse la limite, bannir l'utilisateur
+      if (messageCountRef.current >= MAX_MESSAGES_ALLOWED) {
+        try {
+          // Ajouter l'utilisateur à la table des utilisateurs bannis
+          const { error: banError } = await supabase
+            .from('banned_users')
+            .upsert({
+              user_id: user.id,
+              banned_at: new Date().toISOString(),
+              ban_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 semaine
+              reason: "Envoi excessif de messages (spam)"
+            });
+            
+          if (banError) {
+            console.error("Erreur lors du bannissement de l'utilisateur:", banError);
+          } else {
+            // Mettre à jour l'état local
+            setBanInfo({
+              isBanned: true,
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+            });
+            
+            alert("Vous avez été banni pendant 1 semaine pour envoi excessif de messages.");
+            
+            // Réinitialiser le compteur
+            messageCountRef.current = 0;
+            return;
+          }
+        } catch (err) {
+          console.error("Erreur inattendue lors du bannissement:", err);
+        }
       }
+    } else if (timeSinceLastMessage > COOLDOWN_PERIOD_MS) {
+      // Si assez de temps s'est écoulé, réinitialiser le compteur
+      messageCountRef.current = 0;
     }
-    window.localStorage.setItem('lastMessageTime', Date.now().toString());
+    
+    // Mettre à jour le timestamp du dernier message
+    lastMessageTimeRef.current = currentTime;
+    window.localStorage.setItem('lastMessageTime', currentTime.toString());
     
     const senderName = displayName || user.email?.split('@')[0] || 'Utilisateur';
     
@@ -230,8 +292,16 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       });
     
     if (error) {
-      console.error('Error sending message:', error);
-      alert("Erreur lors de l'envoi du message");
+      // Si l'erreur est liée au bannissement
+      if (error.code === '42501') {
+        alert("Vous êtes banni et ne pouvez pas envoyer de messages.");
+        
+        // Mettre à jour le statut de bannissement côté client
+        setBanInfo({ isBanned: true });
+      } else {
+        console.error('Error sending message:', error);
+        alert("Erreur lors de l'envoi du message");
+      }
     }
     
     // Réinitialiser le champ de saisie
@@ -354,6 +424,56 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
+
+  // Fonction pour vérifier si l'utilisateur est banni
+  useEffect(() => {
+    // Vérifier si l'utilisateur est banni à chaque chargement
+    const checkUserBanStatus = async () => {
+      if (!user) return;
+      
+      try {
+        // Appeler la fonction RPC pour vérifier si l'utilisateur est banni
+        const { data, error } = await supabase.rpc('is_user_banned', {
+          check_user_id: user.id
+        });
+        
+        if (error) {
+          console.error("Erreur lors de la vérification du statut de bannissement:", error);
+          return;
+        }
+        
+        // Si l'utilisateur est banni, récupérer les détails
+        if (data === true) {
+          const { data: banData, error: banError } = await supabase
+            .from('banned_users')
+            .select('ban_expires_at, reason')
+            .eq('user_id', user.id)
+            .single();
+            
+          if (banError) {
+            console.error("Erreur lors de la récupération des détails du bannissement:", banError);
+            return;
+          }
+          
+          if (banData) {
+            setBanInfo({
+              isBanned: true,
+              expiresAt: banData.ban_expires_at
+            });
+            
+            // Afficher un message à l'utilisateur
+            alert(`Vous êtes banni pour spam jusqu'au ${new Date(banData.ban_expires_at).toLocaleString()}. Vous ne pourrez pas envoyer de messages pendant cette période.`);
+          }
+        } else {
+          setBanInfo({ isBanned: false });
+        }
+      } catch (err) {
+        console.error("Erreur inattendue:", err);
+      }
+    };
+    
+    checkUserBanStatus();
+  }, [user]);
 
   return (
     <div className="w-[100vw] h-[100vh] flex flex-col bg-gray-900">
