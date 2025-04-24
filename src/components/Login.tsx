@@ -8,30 +8,45 @@ function Login({ onRegister }: { onRegister: () => void }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
-  const isFormValid = email.trim() !== '' && password.trim() !== ''
+  
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+  
+  const isFormValid = email.trim() !== '' && password.trim() !== '' && validateEmail(email)
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!isFormValid) return
+    if (!isFormValid) {
+      if (!validateEmail(email)) {
+        setError("Format d'email invalide")
+        return
+      }
+      return
+    }
     
     try {
       setLoading(true)
       setError(null)
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email, 
+      
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(), 
         password: password,
       })
       
       if (error) throw error
       
-      console.log('User logged in:', data)
+      
+      console.log('User logged in successfully')
     } catch (error) {
       if (error instanceof Error) {
-        setError(error.message)
+        
+        setError("Échec de connexion. Vérifiez vos identifiants.")
+        console.error(error.message) 
       } else {
-        setError('An unexpected error occurred')
+        setError('Une erreur inattendue est survenue')
       }
     } finally {
       setLoading(false)

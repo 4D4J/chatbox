@@ -30,7 +30,7 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const [updateMessage, setUpdateMessage] = useState<{text: string, isError: boolean} | null>(null)
   const [loading, setLoading] = useState(false)
   
-  // Chat related states
+  
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [channels] = useState<Channel[]>([
@@ -40,13 +40,20 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   ])
   const [activeChannel, setActiveChannel] = useState<number>(1)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const [connectedUsers, setConnectedUsers] = useState<number>(1) // Pour afficher le nombre d'utilisateurs
+  const [connectedUsers, setConnectedUsers] = useState<number>(1)
 
   useEffect(() => {
     const getCurrentUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      setUser(data.user)
+      const { data, error } = await supabase.auth.getUser()
       
+      if (error || !data.user) {
+        
+        console.error("Erreur d'authentification:", error)
+        onLogout()
+        return
+      }
+      
+      setUser(data.user)
       
       if (data.user?.user_metadata?.display_name) {
         setDisplayName(data.user.user_metadata.display_name)
@@ -85,7 +92,7 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   }, [messages])
 
   useEffect(() => {
-    // Configuration des messages initiaux selon le canal
+    
     const getWelcomeMessage = (channelId: number): Message => {
       return {
         id: channelId,
@@ -101,10 +108,10 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       };
     };
 
-    // Réinitialiser les messages avec juste le message de bienvenue
+    
     setMessages([getWelcomeMessage(activeChannel)]);
     
-    // S'abonner aux messages en temps réel pour ce canal
+  
     const subscription = supabase
       .channel(`temp_messages:channel_id=eq.${activeChannel}`)
       .on('postgres_changes', { 
@@ -118,13 +125,13 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       })
       .subscribe();
     
-    // Nettoyer l'abonnement lors du changement de canal
+    
     return () => {
       subscription.unsubscribe();
     };
   }, [activeChannel]);
 
-  // S'abonner au statut de présence pour compter les utilisateurs connectés
+  
   useEffect(() => {
     const presenceChannel = supabase.channel('online-users', {
       config: {
@@ -153,10 +160,64 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
     };
   }, [user]);
 
+  // Ajouter un timer pour nettoyer les messages expirés côté client et pour la sécurité
+  useEffect(() => {
+    // Fonction pour filtrer les messages expirés (plus vieux qu'une heure)
+    const filterExpiredMessages = () => {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      
+      setMessages(prevMessages => 
+        prevMessages.filter(msg => {
+          // Garder toujours le message système de bienvenue
+          if (msg.user_id === 'system') return true;
+          
+          // Filtrer les autres messages selon leur date de création
+          const messageDate = new Date(msg.created_at);
+          return messageDate > oneHourAgo;
+        })
+      );
+    };
+
+    // Exécuter le nettoyage toutes les minutes
+    const cleanupInterval = setInterval(filterExpiredMessages, 60 * 1000);
+    
+    // Exécuter une fois au démarrage
+    filterExpiredMessages();
+    
+    // Nettoyer l'intervalle lors du démontage du composant
+    return () => clearInterval(cleanupInterval);
+  }, [activeChannel]);
+  
+  // Ajouter la validation et assainissement des messages avant envoi
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !user) return;
     
+    // Validation de sécurité pour les messages
+    const trimmedMessage = inputMessage.trim();
+    
+    // Limite de taille pour éviter les attaques par déni de service
+    if (trimmedMessage.length > 1000) {
+      alert("Le message est trop long (maximum 1000 caractères)");
+      return;
+    }
+    
+    // Protection contre l'envoi trop rapide (anti-spam)
+    if (window.localStorage.getItem('lastMessageTime')) {
+      const lastTime = parseInt(window.localStorage.getItem('lastMessageTime') || '0');
+      const currentTime = Date.now();
+      if (currentTime - lastTime < 500) { // 500ms de délai minimum entre messages
+        alert("Vous envoyez des messages trop rapidement")
+        return;
+      }
+    }
+    window.localStorage.setItem('lastMessageTime', Date.now().toString());
+    
     const senderName = displayName || user.email?.split('@')[0] || 'Utilisateur';
+    
+    // Assainissement côté client avant envoi à Supabase
+    const sanitizedMessage = trimmedMessage
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
     
     // Envoyer le message via Supabase Realtime
     const { error } = await supabase
@@ -164,12 +225,13 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       .insert({
         user_id: user.id,
         channel_id: activeChannel,
-        content: inputMessage.trim(),
+        content: sanitizedMessage,
         display_name: senderName
       });
     
     if (error) {
       console.error('Error sending message:', error);
+      alert("Erreur lors de l'envoi du message");
     }
     
     // Réinitialiser le champ de saisie
@@ -246,7 +308,21 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   }
 
   const handleUpdatePassword = async () => {
-    if (!newPassword) return
+    if (!newPassword) return;
+    
+    
+    if (newPassword.length < 8) {
+      setUpdateMessage({ text: 'Le mot de passe doit contenir au moins 8 caractères', isError: true });
+      return;
+    }
+    
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setUpdateMessage({ 
+        text: 'Le mot de passe doit contenir au moins une lettre majuscule, une lettre minuscule et un chiffre', 
+        isError: true 
+      });
+      return;
+    }
     
     try {
       setLoading(true)
@@ -256,17 +332,27 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       
       if (error) throw error
       
-      setUpdateMessage({ text: 'Password updated successfully!', isError: false })
+      setUpdateMessage({ text: 'Mot de passe mis à jour avec succès!', isError: false })
       setNewPassword('')
     } catch (error) {
       if (error instanceof Error) {
         setUpdateMessage({ text: error.message, isError: true })
       } else {
-        setUpdateMessage({ text: 'An unexpected error occurred', isError: true })
+        setUpdateMessage({ text: 'Une erreur inattendue est survenue', isError: true })
       }
     } finally {
       setLoading(false)
     }
+  }
+
+
+  const sanitizeContent = (content: string): string => {
+    return content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   return (
@@ -314,6 +400,10 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
                     <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-2"></span>
                     {connectedUsers} utilisateur{connectedUsers > 1 ? 's' : ''} en ligne
                   </p>
+                  <p className="text-gray-400 text-sm mt-2">
+                    <span className="inline-block w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>
+                    Les messages sont effacés toutes les heures
+                  </p>
                 </div>
             </div>
 
@@ -330,7 +420,7 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
                 <div className="flex-1 overflow-y-auto mb-4 p-2">
                     {messages.length === 0 ? (
                         <div className="text-gray-400 text-center mt-10">
-                            Pas encore de messages dans ce canal. Commencez la conversation!
+                            Pas encore de messages dans ce canal. Commencez la sonversation!
                         </div>
                     ) : (
                         messages.map((message) => (
@@ -338,7 +428,7 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
                                 <span className={`font-bold ${message.user_id === user?.id ? 'text-green-400' : 'text-blue-400'}`}>
                                     {message.user?.user_metadata?.display_name || message.user?.email?.split('@')[0] || 'Inconnu'}: 
                                 </span>
-                                <span className="text-white ml-1"> {message.content}</span>
+                                <span className="text-white ml-1" dangerouslySetInnerHTML={{__html: sanitizeContent(message.content)}}></span>
                             </div>
                         ))
                     )}

@@ -9,44 +9,80 @@ function Register({ onBackToLogin }: { onBackToLogin: () => void }) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Validations de sécurité améliorées
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const validatePassword = (password: string) => {
+    // Au moins 8 caractères, une majuscule, une minuscule, un chiffre
+    return password.length >= 8 && 
+           /[A-Z]/.test(password) && 
+           /[a-z]/.test(password) && 
+           /[0-9]/.test(password);
+  };
   
-  const isFormValid = email.trim() !== '' && 
-                      username.trim() !== '' &&
-                      password.trim() !== '' && 
-                      confirmPassword.trim() !== '' && 
-                      password === confirmPassword
+  const validateUsername = (username: string) => {
+    // Alphanumériques et underscore/tiret, 3-30 caractères
+    return /^[a-zA-Z0-9_-]{3,30}$/.test(username);
+  };
+  
+  const getFormValidationError = () => {
+    if (!email.trim()) return "L'email est requis";
+    if (!validateEmail(email)) return "Format d'email invalide";
+    if (!username.trim()) return "Le nom d'utilisateur est requis";
+    if (!validateUsername(username)) return "Le nom d'utilisateur doit contenir 3-30 caractères alphanumériques, tirets ou underscores";
+    if (!password) return "Le mot de passe est requis";
+    if (!validatePassword(password)) return "Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule et un chiffre";
+    if (password !== confirmPassword) return "Les mots de passe ne correspondent pas";
+    return null;
+  };
+  
+  const isFormValid = !getFormValidationError();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!isFormValid) return
+    const validationError = getFormValidationError();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     
     try {
       setLoading(true)
       setError(null)
       
       // Store display_name in user metadata
-      const { data, error } = await supabase.auth.signUp({
-        email: email, 
+      const { error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(), 
         password: password,
         options: {
           data: {
-            display_name: username
+            display_name: username.trim()
           }
         }
       })
       
       if (error) throw error
       
-      console.log('User registered:', data)
-      alert('Registration successful! Please check your email for confirmation.')
+      // Éviter de logger les informations sensibles
+      console.log('User registration successful')
+      alert('Inscription réussie ! Veuillez vérifier votre email pour confirmer votre compte.')
       onBackToLogin()
       
     } catch (error) {
       if (error instanceof Error) {
-        setError(error.message)
+        // Message d'erreur générique pour éviter les fuites d'information
+        if (error.message.includes("already")) {
+          setError("Cet email est déjà utilisé")
+        } else {
+          setError("L'inscription a échoué. Veuillez réessayer.")
+          console.error(error.message) // Log technique pour debug
+        }
       } else {
-        setError('An unexpected error occurred')
+        setError('Une erreur inattendue est survenue')
       }
     } finally {
       setLoading(false)
@@ -129,7 +165,7 @@ function Register({ onBackToLogin }: { onBackToLogin: () => void }) {
 
           {/* Back to Login */}
           <div className='w-[45%] h-[3vh] flex items-center justify-center bg-gray-800 rounded-lg shadow-md'>
-            <h3 className='text-white font-bold'>Already have an account? </h3> &nbsp;
+            <h3 className='text-white font-bold'>Already have an account ? </h3> &nbsp;
             <button onClick={onBackToLogin} className="mt-2 p-2 rounded text-white cursor-pointer">Login</button>
           </div>
         </div>
