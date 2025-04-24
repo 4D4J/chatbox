@@ -40,8 +40,8 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   ])
   const [activeChannel, setActiveChannel] = useState<number>(1)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [connectedUsers, setConnectedUsers] = useState<number>(1) // Pour afficher le nombre d'utilisateurs
 
-  
   useEffect(() => {
     const getCurrentUser = async () => {
       const { data } = await supabase.auth.getUser()
@@ -84,84 +84,97 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
     scrollToBottom()
   }, [messages])
 
-  
   useEffect(() => {
-    
-    const getLocalMessages = (channelId: number) => {
-      const localMessages: Message[] = []
-      
-      if (channelId === 1) {
-        localMessages.push({
-          id: 1,
-          user_id: 'system',
-          channel_id: 1,
-          content: ' Bienvenue dans le canal général!',
-          created_at: new Date().toISOString(),
-          user: { email: 'system@example.com', user_metadata: { display_name: 'Système' } }
-        })
-      } else if (channelId === 2) {
-        localMessages.push({
-          id: 2,
-          user_id: 'system',
-          channel_id: 2,
-          content: ' Posez vos questions ici!',
-          created_at: new Date().toISOString(),
-          user: { email: 'system@example.com', user_metadata: { display_name: 'Système' } }
-        })
-      } else if (channelId === 3) {
-        localMessages.push({
-          id: 3,
-          user_id: 'system',
-          channel_id: 3,
-          content: ' Besoin d\'aide? C\'est le bon endroit!',
-          created_at: new Date().toISOString(),
-          user: { email: 'system@example.com', user_metadata: { display_name: 'Système' } }
-        })
-      }
-      
-      
-      const storedMessages = localStorage.getItem(`channel_${channelId}_messages`)
-      if (storedMessages) {
-        const parsedMessages = JSON.parse(storedMessages) as Message[]
-        localMessages.push(...parsedMessages)
-      }
-      
-      return localMessages
-    }
-    
-    
-    setMessages(getLocalMessages(activeChannel))
-  }, [activeChannel])
+    // Configuration des messages initiaux selon le canal
+    const getWelcomeMessage = (channelId: number): Message => {
+      return {
+        id: channelId,
+        user_id: 'system',
+        channel_id: channelId,
+        content: channelId === 1 
+          ? 'Bienvenue dans le canal général!' 
+          : channelId === 2 
+            ? 'Posez vos questions ici!' 
+            : 'Besoin d\'aide? C\'est le bon endroit!',
+        created_at: new Date().toISOString(),
+        user: { email: 'system@example.com', user_metadata: { display_name: 'Système' } }
+      };
+    };
 
-  const handleSendMessage = () => {
-    if (!inputMessage.trim() || !user) return
+    // Réinitialiser les messages avec juste le message de bienvenue
+    setMessages([getWelcomeMessage(activeChannel)]);
     
+    // S'abonner aux messages en temps réel pour ce canal
+    const subscription = supabase
+      .channel(`temp_messages:channel_id=eq.${activeChannel}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'temp_messages',
+        filter: `channel_id=eq.${activeChannel}`
+      }, (payload) => {
+        const newMessage = payload.new as Message;
+        setMessages(prevMessages => [...prevMessages, newMessage]);
+      })
+      .subscribe();
     
-    const newMessage: Message = {
-      id: Date.now(), 
-      user_id: user.id,
-      channel_id: activeChannel,
-      content: inputMessage.trim(),
-      created_at: new Date().toISOString(),
-      user: {
-        email: user.email || '',
-        user_metadata: {
-          display_name: displayName || user.email?.split('@')[0] || ''
+    // Nettoyer l'abonnement lors du changement de canal
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [activeChannel]);
+
+  // S'abonner au statut de présence pour compter les utilisateurs connectés
+  useEffect(() => {
+    const presenceChannel = supabase.channel('online-users', {
+      config: {
+        presence: {
+          key: user?.id || 'anonymous',
+        },
+      },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        setConnectedUsers(Object.keys(state).length);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            user_id: user?.id,
+            online_at: new Date().toISOString(),
+          });
         }
-      }
+      });
+
+    return () => {
+      presenceChannel.unsubscribe();
+    };
+  }, [user]);
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || !user) return;
+    
+    const senderName = displayName || user.email?.split('@')[0] || 'Utilisateur';
+    
+    // Envoyer le message via Supabase Realtime
+    const { error } = await supabase
+      .from('temp_messages')
+      .insert({
+        user_id: user.id,
+        channel_id: activeChannel,
+        content: inputMessage.trim(),
+        display_name: senderName
+      });
+    
+    if (error) {
+      console.error('Error sending message:', error);
     }
     
-    
-    const updatedMessages = [...messages, newMessage]
-    setMessages(updatedMessages)
-    
-    
-    const storedMessages = updatedMessages.filter(msg => msg.user_id !== 'system')
-    localStorage.setItem(`channel_${activeChannel}_messages`, JSON.stringify(storedMessages))
-    
-    
-    setInputMessage('')
-  }
+    // Réinitialiser le champ de saisie
+    setInputMessage('');
+  };
 
   const handleChannelSelect = (channelId: number) => {
     setActiveChannel(channelId)
@@ -280,10 +293,7 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       </div>
       
       <div className="flex flex-1 p-4">
-        {/* ChatBox */}
         <div className="w-[100%] bg-gray-800 flex flex-row items-center justify-around p-4 text-white">
-
-            {/* Liste des canaux */}
             <div className='w-[20vw] h-[95%] bg-gray-700 p-4 rounded-lg shadow-md mr-4 border border-white flex flex-col'>
                 <h2 className="text-xl font-bold mb-4 border-b pb-2">Canaux</h2>
                 <div className="flex-1 overflow-y-auto mb-4">
@@ -296,6 +306,14 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
                             # {channel.name}
                         </div>
                     ))}
+                </div>
+
+                {/* Afficher le nombre d'utilisateurs connectés */}
+                <div className="mt-auto pt-4 border-t border-gray-600">
+                  <p className="text-green-400">
+                    <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+                    {connectedUsers} utilisateur{connectedUsers > 1 ? 's' : ''} en ligne
+                  </p>
                 </div>
             </div>
 
