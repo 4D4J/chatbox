@@ -37,6 +37,7 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const [loading, setLoading] = useState(false)
   
   
+  // État pour la gestion des messages et des canaux
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [channels] = useState<Channel[]>([
@@ -50,13 +51,6 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
 
   // État pour gérer le bannissement
   const [banInfo, setBanInfo] = useState<BanInfo>({ isBanned: false });
-  const messageCountRef = useRef<number>(0);
-  const lastMessageTimeRef = useRef<number>(Date.now());
-  
-  // Constantes pour la détection de spam
-  const MAX_MESSAGES_ALLOWED = 5; // Maximum de messages consécutifs rapides
-  const TIME_WINDOW_MS = 5000; // Fenêtre de temps pour considérer comme spam (5 secondes)
-  const COOLDOWN_PERIOD_MS = 30000; // Période de réinitialisation du compteur (30 secondes)
   
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -208,110 +202,44 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !user) return;
     
-    // Vérification si l'utilisateur est banni
+    // Vérifier si l'utilisateur est banni
     if (banInfo.isBanned) {
-      const expiration = banInfo.expiresAt ? new Date(banInfo.expiresAt).toLocaleString() : "date inconnue";
-      alert(`Vous êtes banni jusqu'au ${expiration}. Vous ne pouvez pas envoyer de messages.`);
+      const expiresDate = banInfo.expiresAt ? new Date(banInfo.expiresAt).toLocaleString() : 'date inconnue';
+      alert(`Vous ne pouvez pas envoyer de messages car vous êtes banni jusqu'au ${expiresDate}`);
       return;
     }
     
-    // Validation de sécurité pour les messages
+    // Validation de base et assainissement
     const trimmedMessage = inputMessage.trim();
-    
-    // Limite de taille pour éviter les attaques par déni de service
     if (trimmedMessage.length > 1000) {
       alert("Le message est trop long (maximum 1000 caractères)");
       return;
     }
     
-    // Détection de spam avec bannissement
-    const currentTime = Date.now();
-    const timeSinceLastMessage = currentTime - lastMessageTimeRef.current;
-    
-    // Si le message est envoyé rapidement (dans la fenêtre de temps)
-    if (timeSinceLastMessage < TIME_WINDOW_MS) {
-      // Incrémente le compteur de messages rapides
-      messageCountRef.current += 1;
-      
-      // Si le nombre de messages dépasse la limite, bannir l'utilisateur
-      if (messageCountRef.current >= MAX_MESSAGES_ALLOWED) {
-        try {
-          // Ajouter l'utilisateur à la table des utilisateurs bannis
-          const { error: banError } = await supabase
-            .from('banned_users')
-            .upsert({
-              user_id: user.id,
-              banned_at: new Date().toISOString(),
-              ban_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 semaine
-              reason: "Envoi excessif de messages (spam)"
-            });
-            
-          if (banError) {
-            console.error("Erreur lors du bannissement de l'utilisateur:", banError);
-          } else {
-            // Mettre à jour l'état local
-            setBanInfo({
-              isBanned: true,
-              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-            });
-            
-            alert("Vous avez été banni pendant 1 semaine pour envoi excessif de messages.");
-            
-            // Réinitialiser le compteur
-            messageCountRef.current = 0;
-            return;
-          }
-        } catch (err) {
-          console.error("Erreur inattendue lors du bannissement:", err);
-        }
-      }
-    } else if (timeSinceLastMessage > COOLDOWN_PERIOD_MS) {
-      // Si assez de temps s'est écoulé, réinitialiser le compteur
-      messageCountRef.current = 0;
-    }
-    
-    // Mettre à jour le timestamp du dernier message
-    lastMessageTimeRef.current = currentTime;
-    window.localStorage.setItem('lastMessageTime', currentTime.toString());
-    
     const senderName = displayName || user.email?.split('@')[0] || 'Utilisateur';
-    
-    // Assainissement côté client avant envoi à Supabase
-    const sanitizedMessage = trimmedMessage
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-    
-    // Envoyer le message via Supabase Realtime - SIMPLIFIÉ sans champs additionnels problématiques
     try {
       const { error } = await supabase
         .from('temp_messages')
-        .insert({
-          user_id: user.id,
-          channel_id: activeChannel,
-          content: sanitizedMessage,
-          display_name: senderName
-          // Laisser le système gérer created_at et expires_at avec les valeurs par défaut
-        });
+        .insert([
+          {
+            user_id: user.id,
+            channel_id: activeChannel,
+            content: trimmedMessage,
+            display_name: senderName
+          }
+        ]);
       
       if (error) {
-        // Si l'erreur est liée au bannissement
-        if (error.code === '42501') {
-          alert("Vous êtes banni et ne pouvez pas envoyer de messages.");
-          
-          // Mettre à jour le statut de bannissement côté client
-          setBanInfo({ isBanned: true });
-        } else {
-          console.error('Error sending message:', error);
-          alert(`Erreur lors de l'envoi du message: ${error.message}`);
-        }
+        console.error('Error sending message:', error);
+        alert(`Erreur: ${error.message}`);
+      } else {
+        // Réinitialiser le champ de saisie
+        setInputMessage('');
       }
     } catch (err) {
-      console.error("Erreur inattendue lors de l'envoi du message:", err);
-      alert("Une erreur inattendue s'est produite lors de l'envoi du message.");
+      console.error("Exception:", err);
+      alert("Une erreur inattendue s'est produite.");
     }
-    
-    // Réinitialiser le champ de saisie
-    setInputMessage('');
   };
 
   const handleChannelSelect = (channelId: number) => {
