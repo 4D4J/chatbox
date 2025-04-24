@@ -1,6 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { User } from '@supabase/supabase-js'
+
+interface Message {
+  id: number
+  user_id: string
+  channel_id: number
+  content: string
+  created_at: string
+  user: {
+    email: string
+    user_metadata: {
+      display_name?: string
+    }
+  }
+}
+
+interface Channel {
+  id: number
+  name: string
+}
 
 function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const [user, setUser] = useState<User | null>(null)
@@ -10,13 +29,25 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   const [newPassword, setNewPassword] = useState('')
   const [updateMessage, setUpdateMessage] = useState<{text: string, isError: boolean} | null>(null)
   const [loading, setLoading] = useState(false)
+  
+  // Chat related states
+  const [messages, setMessages] = useState<Message[]>([])
+  const [inputMessage, setInputMessage] = useState('')
+  const [channels] = useState<Channel[]>([
+    { id: 1, name: 'Général' },
+    { id: 2, name: 'Questions' },
+    { id: 3, name: 'Aide' }
+  ])
+  const [activeChannel, setActiveChannel] = useState<number>(1)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  
   useEffect(() => {
     const getCurrentUser = async () => {
       const { data } = await supabase.auth.getUser()
       setUser(data.user)
       
-      // Set display name from user metadata if it exists
+      
       if (data.user?.user_metadata?.display_name) {
         setDisplayName(data.user.user_metadata.display_name)
       }
@@ -30,7 +61,6 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
           onLogout()
         } else if (session) {
           setUser(session.user)
-          // Set display name from user metadata if it exists
           if (session.user?.user_metadata?.display_name) {
             setDisplayName(session.user.user_metadata.display_name)
           }
@@ -44,7 +74,99 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       }
     }
   }, [onLogout])
+
   
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  
+  useEffect(() => {
+    
+    const getLocalMessages = (channelId: number) => {
+      const localMessages: Message[] = []
+      
+      if (channelId === 1) {
+        localMessages.push({
+          id: 1,
+          user_id: 'system',
+          channel_id: 1,
+          content: ' Bienvenue dans le canal général!',
+          created_at: new Date().toISOString(),
+          user: { email: 'system@example.com', user_metadata: { display_name: 'Système' } }
+        })
+      } else if (channelId === 2) {
+        localMessages.push({
+          id: 2,
+          user_id: 'system',
+          channel_id: 2,
+          content: ' Posez vos questions ici!',
+          created_at: new Date().toISOString(),
+          user: { email: 'system@example.com', user_metadata: { display_name: 'Système' } }
+        })
+      } else if (channelId === 3) {
+        localMessages.push({
+          id: 3,
+          user_id: 'system',
+          channel_id: 3,
+          content: ' Besoin d\'aide? C\'est le bon endroit!',
+          created_at: new Date().toISOString(),
+          user: { email: 'system@example.com', user_metadata: { display_name: 'Système' } }
+        })
+      }
+      
+      
+      const storedMessages = localStorage.getItem(`channel_${channelId}_messages`)
+      if (storedMessages) {
+        const parsedMessages = JSON.parse(storedMessages) as Message[]
+        localMessages.push(...parsedMessages)
+      }
+      
+      return localMessages
+    }
+    
+    
+    setMessages(getLocalMessages(activeChannel))
+  }, [activeChannel])
+
+  const handleSendMessage = () => {
+    if (!inputMessage.trim() || !user) return
+    
+    
+    const newMessage: Message = {
+      id: Date.now(), 
+      user_id: user.id,
+      channel_id: activeChannel,
+      content: inputMessage.trim(),
+      created_at: new Date().toISOString(),
+      user: {
+        email: user.email || '',
+        user_metadata: {
+          display_name: displayName || user.email?.split('@')[0] || ''
+        }
+      }
+    }
+    
+    
+    const updatedMessages = [...messages, newMessage]
+    setMessages(updatedMessages)
+    
+    
+    const storedMessages = updatedMessages.filter(msg => msg.user_id !== 'system')
+    localStorage.setItem(`channel_${activeChannel}_messages`, JSON.stringify(storedMessages))
+    
+    
+    setInputMessage('')
+  }
+
+  const handleChannelSelect = (channelId: number) => {
+    setActiveChannel(channelId)
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
   }
@@ -133,44 +255,106 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       setLoading(false)
     }
   }
-  
+
   return (
     <div className="w-[100vw] h-[100vh] flex flex-col bg-gray-900">
-      <div className="w-[full] bg-gray-800 p-4 flex justify-between items-center">
+      <div className="w-[100%] bg-gray-800 p-4 flex justify-between items-center">
 
         <h1 className="text-white text-2xl font-bold">ChatBox</h1>
 
-        <div className="w-[10vw] flex items-center justify-evenly">
+        <div className="flex items-center justify-evenly">
           <span className="text-white mr-4">{displayName || user?.email}</span>
           <button 
             onClick={handleOpenProfileSettings}
             className="bg-gray-500 cursor-pointer hover:bg-gray-700 text-white px-4 py-2 rounded mr-2"
           >
-            Profile Settings
+            Paramètres
           </button>
           <button 
             onClick={handleLogout}
             className="bg-rose-600 cursor-pointer hover:bg-rose-700 text-white px-4 py-2 rounded"
           >
-            Logout
+            Déconnexion
           </button>
         </div>
       </div>
       
       <div className="flex flex-1 p-4">
         {/* ChatBox */}
-        <div className="bg-gray-800 w-full rounded-lg p-4 text-white">
-          <p>Welcome to ChatBox! Chat functionality coming soon.</p>
+        <div className="w-[100%] bg-gray-800 flex flex-row items-center justify-around p-4 text-white">
+
+            {/* Liste des canaux */}
+            <div className='w-[20vw] h-[95%] bg-gray-700 p-4 rounded-lg shadow-md mr-4 border border-white flex flex-col'>
+                <h2 className="text-xl font-bold mb-4 border-b pb-2">Canaux</h2>
+                <div className="flex-1 overflow-y-auto mb-4">
+                    {channels.map(channel => (
+                        <div 
+                            key={channel.id}
+                            onClick={() => handleChannelSelect(channel.id)}
+                            className={`p-2 mb-1 rounded cursor-pointer ${activeChannel === channel.id ? 'bg-gray-600 font-bold' : 'hover:bg-gray-600'}`}
+                        >
+                            # {channel.name}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Chat en direct */}
+            <div className='w-[65vw] h-[95%] bg-gray-800 p-4 rounded-lg shadow-md border border-white flex flex-col'>
+                {/* Nom du canal */}
+                <div className="pb-2 mb-4 border-b border-gray-600">
+                    <h2 className="text-xl font-bold">
+                        #{channels.find(c => c.id === activeChannel)?.name || 'Canal'}
+                    </h2>
+                </div>
+                
+                {/* Zone d'affichage des messages */}
+                <div className="flex-1 overflow-y-auto mb-4 p-2">
+                    {messages.length === 0 ? (
+                        <div className="text-gray-400 text-center mt-10">
+                            Pas encore de messages dans ce canal. Commencez la conversation!
+                        </div>
+                    ) : (
+                        messages.map((message) => (
+                            <div key={message.id} className="mb-2">
+                                <span className={`font-bold ${message.user_id === user?.id ? 'text-green-400' : 'text-blue-400'}`}>
+                                    {message.user?.user_metadata?.display_name || message.user?.email?.split('@')[0] || 'Inconnu'}: 
+                                </span>
+                                <span className="text-white ml-1"> {message.content}</span>
+                            </div>
+                        ))
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
+                
+                {/* Zone de saisie des messages */}
+                <div className="flex mt-auto">
+                    <input
+                        type="text"
+                        placeholder="Tapez un message..."
+                        className="flex-1 p-2 rounded-l bg-gray-700 text-white"
+                        value={inputMessage}
+                        onChange={(e) => setInputMessage(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                    />
+                    <button
+                        onClick={handleSendMessage}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-r"
+                    >
+                        Envoyer
+                    </button>
+                </div>
+            </div>
         </div>
       </div>
 
-      {/* Profile Settings */}
+      {/* Paramètres du profil */}
       {showProfileSettings && (
-        <div className="fixed inset-0 bg-gray-900/80 flex items-center justify-center z-50">
-          <div className="w-[20vw] h-[30vh] bg-gray-800 rounded-lg p-6 max-w-[90%] max-h-[90vh] flex flex-col justify-between items-center overflow-y-auto">
-            <div className="w-[100%] h-[full] flex justify-between items-center mb-6">
+        <div className="w-[auto] h-[auto] max-w-[100%] fixed inset-0 bg-gray-900/80 flex items-center justify-center z-50">
+          <div className="w-[20vw] h-[30vh] bg-gray-800 rounded-lg p-6 flex flex-col justify-between items-center overflow-y-auto">
+            <div className="w-[100%] h-[100%] flex justify-between items-center mb-6">
 
-              <h2 className="text-white text-2xl font-bold">Profile Settings</h2>
+              <h2 className="text-white text-2xl font-bold">Paramètres du profil</h2>
 
               <button 
                 onClick={handleCloseProfileSettings}
@@ -186,13 +370,13 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
               </div>
             )}
 
-            {/* Update Display Name */}
+            {/* Mise à jour du nom d'affichage */}
             <div className="w-[100%] h-[auto] mb-6">
-              <h3 className="text-white text-xl font-bold mb-2">Display Name</h3>
+              <h3 className="text-white text-xl font-bold mb-2">Nom d'affichage</h3>
               <div className="flex flex-col">
                 <input
                   type="text"
-                  placeholder="Display Name"
+                  placeholder="Nom d'affichage"
                   className="p-2 rounded bg-gray-700 text-white mb-2"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
@@ -202,18 +386,18 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
                   disabled={!displayName || loading}
                   className={`p-2 rounded text-white ${!displayName || loading ? 'bg-gray-600 cursor-pointer' : 'bg-gray-600 hover:bg-gray-700'}`}
                 >
-                  {loading ? 'Updating...' : 'Update Display Name'}
+                  {loading ? 'Mise à jour...' : 'Mettre à jour le nom'}
                 </button>
               </div>
             </div>
 
-            {/* Update Email */}
+            {/* Mise à jour de l'email */}
             <div className=" w-[100%] h-[auto] mb-6">
-              <h3 className="text-white text-xl font-bold mb-2">Update Email</h3>
+              <h3 className="text-white text-xl font-bold mb-2">Mise à jour de l'email</h3>
               <div className="flex flex-col">
                 <input
                   type="email"
-                  placeholder="New Email"
+                  placeholder="Nouvel email"
                   className="p-2 rounded bg-gray-700 text-white mb-2"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
@@ -223,18 +407,18 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
                   disabled={!newEmail || loading}
                   className={`p-2 rounded text-white ${!newEmail || loading ? 'bg-gray-600 cursor-pointer' : 'bg-gray-600 hover:bg-gray-700'}`}
                 >
-                  {loading ? 'Updating...' : 'Update Email'}
+                  {loading ? 'Mise à jour...' : 'Mettre à jour l\'email'}
                 </button>
               </div>
             </div>
 
-            {/* Update Password */}
+            {/* Mise à jour du mot de passe */}
             <div className="w-[100%] h-[auto] mb-6">
-              <h3 className="text-white text-xl font-bold mb-2">Update Password</h3>
+              <h3 className="text-white text-xl font-bold mb-2">Mise à jour du mot de passe</h3>
               <div className="flex flex-col">
                 <input
                   type="password"
-                  placeholder="New Password"
+                  placeholder="Nouveau mot de passe"
                   className="p-2 rounded bg-gray-700 text-white mb-2"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -244,7 +428,7 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
                   disabled={!newPassword || loading}
                   className={`p-2 rounded text-white ${!newPassword || loading ? 'bg-gray-600 cursor-pointer' : 'bg-gray-600 hover:bg-gray-700'}`}
                 >
-                  {loading ? 'Updating...' : 'Update Password'}
+                  {loading ? 'Mise à jour...' : 'Mettre à jour le mot de passe'}
                 </button>
               </div>
             </div>

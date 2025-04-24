@@ -1,6 +1,6 @@
-import './App.css'
+import '../App.css'
 import { useState } from 'react'
-import { supabase } from './lib/supabase'
+import { supabase } from '../lib/supabase'
 
 function Login({ onRegister }: { onRegister: () => void }) {
   const [email, setEmail] = useState('')

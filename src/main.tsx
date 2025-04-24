@@ -1,7 +1,7 @@
 import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import Login from './Login.tsx'
+import Login from './components/Login.tsx'
 import Register from './components/Register.tsx'
 import ChatBoxPage from './components/ChatBoxPage.tsx'
 import { supabase } from './lib/supabase.tsx'
