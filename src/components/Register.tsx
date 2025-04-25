@@ -1,5 +1,5 @@
 import '../App.css'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import AnimatedBackground from './AnimatedBackground'
 
@@ -10,6 +10,15 @@ function Register({ onBackToLogin }: { onBackToLogin: () => void }) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Ajout des états pour la validation du mot de passe
+  const [passwordCriteria, setPasswordCriteria] = useState({
+    hasLength: false,
+    hasUppercase: false,
+    hasLowercase: false,
+    hasNumber: false
+  })
+  // État pour contrôler l'affichage des critères du mot de passe
+  const [showPasswordCriteria, setShowPasswordCriteria] = useState(false)
 
   // Validations de sécurité améliorées
   const validateEmail = (email: string) => {
@@ -27,6 +36,43 @@ function Register({ onBackToLogin }: { onBackToLogin: () => void }) {
   const validateUsername = (username: string) => {
     // Alphanumériques et underscore/tiret, 3-30 caractères
     return /^[a-zA-Z0-9_-]{3,30}$/.test(username);
+  };
+  
+  // Fonction pour vérifier les critères du mot de passe individuellement
+  const checkPasswordCriteria = (password: string) => {
+    setPasswordCriteria({
+      hasLength: password.length >= 8,
+      hasUppercase: /[A-Z]/.test(password),
+      hasLowercase: /[a-z]/.test(password),
+      hasNumber: /[0-9]/.test(password)
+    });
+  };
+  
+  // Mettre à jour les critères du mot de passe lorsque le champ est modifié
+  useEffect(() => {
+    checkPasswordCriteria(password);
+  }, [password]);
+  
+  // Fonction pour calculer le score de force du mot de passe (0-100)
+  const calculatePasswordStrength = () => {
+    let score = 0;
+    
+    // Calcul basé sur les critères existants
+    if (passwordCriteria.hasLength) score += 25;
+    if (passwordCriteria.hasUppercase) score += 25;
+    if (passwordCriteria.hasLowercase) score += 25;
+    if (passwordCriteria.hasNumber) score += 25;
+    
+    return score;
+  };
+  
+  // Déterminer la couleur de la barre de progression
+  const getPasswordStrengthColor = () => {
+    const score = calculatePasswordStrength();
+    
+    if (score < 50) return 'bg-red-500'; // Faible
+    if (score < 100) return 'bg-yellow-500'; // Moyen
+    return 'bg-green-500'; // Fort
   };
   
   const getFormValidationError = () => {
@@ -95,7 +141,7 @@ function Register({ onBackToLogin }: { onBackToLogin: () => void }) {
       {/* Fond animé */}
       <AnimatedBackground />
       
-      <div className="w-[30vw] min-w-[350px] h-[50vh] min-h-[450px] flex flex-col items-center justify-evenly auth-container p-8 bg-purple-900/40">
+      <div className="max-w-[35vw] w-[30vw] min-w-[350px] max-h-[70vh] h-[auto] min-h-[50vh] flex flex-col items-center justify-evenly auth-container bg-purple-900/40 p-8">
         {/* Box Title */}
         <div className="mb-6 text-center"> 
           <h1 className="text-white text-4xl font-bold">ChatBox Register</h1>
@@ -107,54 +153,72 @@ function Register({ onBackToLogin }: { onBackToLogin: () => void }) {
           </div>
         )}
 
-        <form className='w-[auto] h-[35vh] flex flex-col items-center justify-around'onSubmit={handleRegister}>
+        <form className='w-[auto] flex flex-col items-center justify-around min-h-[35vh]' onSubmit={handleRegister}>
           {/* Box Email */}
-          <div className="flex flex-col items-center justify-evenly mb-6">
-            <label htmlFor="email" className="block text-white text-xl font-bold mb-2">Email</label>
+          <div className="pb-2 flex flex-col items-center justify-evenly ">
+            <label htmlFor="email" className="pb-1 block text-white text-xl font-bold ">Email</label>
             <input
               id="email"  
               type="email" 
-              placeholder="Enter your email" 
-              className="w-full p-3 rounded-lg auth-input focus:outline-none"
+              placeholder="" 
+              className="w-full rounded-lg auth-input focus:outline-none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           {/* Box Username */}
-          <div className="flex flex-col items-center justify-evenly mb-6">
-            <label htmlFor="username" className="block text-white text-xl font-bold mb-2">Username</label>
+          <div className="pb-7 flex flex-col items-center justify-evenly">
+            <label htmlFor="username" className="pb-1 block text-white text-xl font-bold ">Username</label>
             <input
               id="username"  
               type="text" 
-              placeholder="Choose a username" 
-              className="w-full p-3 rounded-lg auth-input focus:outline-none"
+              placeholder="" 
+              className="w-full rounded-lg auth-input focus:outline-none"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
           </div>
 
           {/* Box Password */}
-          <div className="flex flex-col items-center justify-evenly mb-6">
-            <label htmlFor="password" className="block text-white text-xl font-bold mb-2">Password</label>
+          <div className="pb-2 flex flex-col items-center justify-evenly ">
+            <label htmlFor="password" className="pb-1 block text-white text-xl font-bold ">Password</label>
             <input
               id="password" 
               type="password" 
-              placeholder="*******" 
-              className="w-full p-3 rounded-lg auth-input focus:outline-none"
+              placeholder="" 
+              className="w-full rounded-lg auth-input focus:outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onFocus={() => setShowPasswordCriteria(true)}
             />
+            
+            {/* Indicateurs de validation du mot de passe */}
+            {(showPasswordCriteria || password.length > 0) && (
+              <div className="w-full mt-2">
+                <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-300 ${getPasswordStrengthColor()}`} 
+                    style={{ width: `${calculatePasswordStrength()}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-300 text-right">
+                  {calculatePasswordStrength() < 50 ? 'Faible' : 
+                   calculatePasswordStrength() < 100 ? 'Moyen' : 
+                   'Fort'}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Box Confirm Password */}
           <div className="flex flex-col items-center justify-evenly mb-6">
-            <label htmlFor="confirmPassword" className="block text-white text-xl font-bold mb-2">Confirm Password</label>
+            <label htmlFor="confirmPassword" className="pb-1 block text-white text-xl font-bold">Confirm Password</label>
             <input
               id="confirmPassword" 
               type="password" 
-              placeholder="*******" 
-              className="w-full p-3 rounded-lg auth-input focus:outline-none"
+              placeholder="" 
+              className="w-full rounded-lg auth-input focus:outline-none"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
@@ -164,7 +228,7 @@ function Register({ onBackToLogin }: { onBackToLogin: () => void }) {
           <button 
             type="submit"
             disabled={!isFormValid || loading}
-            className="w-full p-3 rounded-lg font-bold text-white auth-button"
+            className="w-full rounded-lg font-bold text-white auth-button"
           >
             {loading ? 'Registering...' : 'Register'}
           </button>
