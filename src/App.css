@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
 
 /* Reset sélectif au lieu de reset universel */
 body, html {
@@ -53,11 +55,10 @@ body, html {
 .auth-container {
   position: relative;
   z-index: 1;
-  background-color: rgba(88, 28, 135, 0.5); /* Couleur violet semi-transparent */
   backdrop-filter: blur(5px);
   border-radius: 1rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgb(255, 255, 255, 0.5);
 }
 
 .auth-input {
@@ -97,3 +98,4 @@ body, html {
   color: #c4b5fd;
   text-decoration: underline;
 }
+
