@@ -55,7 +55,7 @@ function Login({ onRegister }: { onRegister: () => void }) {
       {/* Fond animé */}
       <AnimatedBackground />
       
-      <div className="w-[30vw] min-w-[350px] h-[50vh] min-h-[450px] flex flex-col items-center justify-evenly auth-container p-8 bg-purple-900/40">
+      <div className="max-w-[35vw] w-[30vw] min-w-[350px] max-h-[70vh] h-[auto] min-h-[50vh] flex flex-col items-center justify-evenly auth-container p-8 bg-purple-900/40">
         {/* Box Title */}
         <div className="mb-6 text-center"> 
           <h1 className="text-white text-4xl font-bold">ChatBox Login</h1>
@@ -67,28 +67,28 @@ function Login({ onRegister }: { onRegister: () => void }) {
           </div>
         )}
 
-        <form className='w-[auto] h-[25vh] flex flex-col items-center justify-around' onSubmit={handleLogin}>
+        <form className='p-4 w-[auto] flex flex-col items-center justify-around min-h-[25vh]' onSubmit={handleLogin}>
           {/* Box Email */}
-          <div className="mb-6 flex flex-col items-center justify-evenly">
+          <div className="flex flex-col items-center justify-evenly w-full min-h-[10vh]">
             <label htmlFor="email" className="block text-white text-xl font-bold mb-2">Email</label>
             <input
               id="email"  
               type="email" 
-              placeholder="Enter your email" 
-              className="w-full p-3 rounded-lg auth-input focus:outline-none"
+              placeholder="" 
+              className="w-full rounded-lg auth-input focus:outline-none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           {/* Box Password */}
-          <div className="mb-6 flex flex-col items-center justify-evenly">
+          <div className="mb-8 flex flex-col items-center justify-evenly w-full min-h-[10vh]">
             <label htmlFor="password" className="block text-white text-xl font-bold mb-2">Password</label>
             <input
               id="password" 
               type="password" 
-              placeholder="*******" 
-              className="w-full p-3 rounded-lg auth-input focus:outline-none"
+              placeholder="" 
+              className="w-full rounded-lg auth-input focus:outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -98,12 +98,12 @@ function Login({ onRegister }: { onRegister: () => void }) {
           <button 
             type="submit"
             disabled={!isFormValid || loading}
-            className="w-full p-3 rounded-lg font-bold text-white auth-button cursor-pointer"
+            className="w-full rounded-lg font-bold text-white auth-button cursor-pointer "
           >
             {loading ? 'Loading...' : 'Login'}
           </button>
           
-          <div className='mt-6 text-center text-white'>
+          <div className='text-center text-white'>
             <button
             onClick={onRegister} 
             className="ml-2 auth-link p-1 cursor-pointer rounded"
