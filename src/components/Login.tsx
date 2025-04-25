@@ -1,13 +1,13 @@
 import '../App.css'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import AnimatedBackground from './AnimatedBackground'
 
 function Login({ onRegister }: { onRegister: () => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
   
   const validateEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -30,7 +30,6 @@ function Login({ onRegister }: { onRegister: () => void }) {
       setLoading(true)
       setError(null)
       
-      
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(), 
         password: password,
@@ -38,11 +37,9 @@ function Login({ onRegister }: { onRegister: () => void }) {
       
       if (error) throw error
       
-      
       console.log('User logged in successfully')
     } catch (error) {
       if (error instanceof Error) {
-        
         setError("Échec de connexion. Vérifiez vos identifiants.")
         console.error(error.message) 
       } else {
@@ -54,40 +51,44 @@ function Login({ onRegister }: { onRegister: () => void }) {
   }
   
   return (
-    <>
-      <div className="w-[100vw] h-[100vh] flex flex-col items-center justify-center bg-gray-900">
-        <div className="w-[30vw] h-[55vh] flex flex-col items-center justify-evenly bg-gray-800 p-4 rounded-lg shadow-lg">
+    <div className="w-[100vw] h-[100vh] flex flex-col items-center justify-center">
+      {/* Fond animé */}
+      <AnimatedBackground />
+      
+      <div className="w-[30vw] min-w-[350px] h-[50vh] min-h-[450px] flex flex-col items-center justify-evenly auth-container p-8 bg-purple-900/40">
+        {/* Box Title */}
+        <div className="mb-6 text-center"> 
+          <h1 className="text-white text-4xl font-bold">ChatBox Login</h1>
+        </div>
 
-          {/* Box Title */}
-          <div className="w-[15vw] h-[5vh] flex items-center justify-center bg-gray-700 rounded-lg shadow-md"> 
-            <h1 className="text-white text-4xl font-bold">ChatBox Login</h1>
+        {error && (
+          <div className="p-3 mb-4 bg-rose-700/80 text-white rounded-lg text-center">
+            {error}
           </div>
+        )}
 
-          {error && (
-            <div className="w-[80%] p-2 bg-rose-700 text-white rounded-lg text-center">
-              {error}
-            </div>
-          )}
-
+        <form className='w-[auto] h-[25vh] flex flex-col items-center justify-around' onSubmit={handleLogin}>
           {/* Box Email */}
-          <div className="w-[80%] h-[15vh] flex flex-col items-center justify-evenly bg-gray-700 rounded-lg shadow-md">
-            <h2 className='text-white text-2xl font-bold'>Email</h2>
-            <input  
+          <div className="mb-6 flex flex-col items-center justify-evenly">
+            <label htmlFor="email" className="block text-white text-xl font-bold mb-2">Email</label>
+            <input
+              id="email"  
               type="email" 
               placeholder="Enter your email" 
-              className="mt-2 p-2 rounded bg-gray-200 text-black"
+              className="w-full p-3 rounded-lg auth-input focus:outline-none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           {/* Box Password */}
-          <div className="w-[80%] h-[15vh] flex flex-col items-center justify-evenly bg-gray-700 rounded-lg shadow-md">
-            <h2 className='text-white text-2xl font-bold'>Password</h2>
-            <input 
+          <div className="mb-6 flex flex-col items-center justify-evenly">
+            <label htmlFor="password" className="block text-white text-xl font-bold mb-2">Password</label>
+            <input
+              id="password" 
               type="password" 
-              placeholder='*******' 
-              className="mt-2 p-2 rounded bg-gray-200 text-black"
+              placeholder="*******" 
+              className="w-full p-3 rounded-lg auth-input focus:outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -95,22 +96,36 @@ function Login({ onRegister }: { onRegister: () => void }) {
 
           {/* Login Button */}
           <button 
-            onClick={handleLogin}
+            type="submit"
             disabled={!isFormValid || loading}
-            className={`w-[40%] py-2 text-white font-bold rounded-lg cursor-not-allowed transition duration-300 ${
-              isFormValid ? 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer' : 'bg-rose-600 hover:bg-rose-700'
-            }`}>
+            className="w-full p-3 rounded-lg font-bold text-white auth-button cursor-pointer"
+          >
             {loading ? 'Loading...' : 'Login'}
           </button>
-
-          {/* Box AskToRegister */}
-          <div className='w-[45%] h-[3vh] flex items-center justify-center bg-gray-800 rounded-lg shadow-md'>
-            <h3 className='text-white font-bold'>Don't have an account ?</h3> &nbsp;
-            <button onClick={onRegister} className="mt-2 p-2 rounded text-white cursor-pointer">Register</button>
+          
+          <div className='mt-6 text-center text-white'>
+            <button
+            onClick={onRegister} 
+            className="ml-2 auth-link p-1 cursor-pointer rounded"
+            >
+            Forgot Password ?
+            </button>
           </div>
+
+        </form>
+
+        {/* Box AskToRegister */}
+        <div className="mt-6 text-center text-white">
+          <span className="font-bold">Don't have an account ? </span> 
+          <button 
+            onClick={onRegister} 
+            className="ml-2 auth-link p-1 cursor-pointer rounded"
+          >
+          Register
+          </button>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
