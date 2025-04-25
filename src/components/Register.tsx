@@ -141,7 +141,7 @@ function Register({ onBackToLogin }: { onBackToLogin: () => void }) {
       {/* Fond animé */}
       <AnimatedBackground />
       
-      <div className="max-w-[35vw] w-[30vw] min-w-[350px] max-h-[70vh] h-[auto] min-h-[50vh] flex flex-col items-center justify-evenly auth-container bg-purple-900/40 p-8">
+      <div className="max-w-[35vw] w-[30vw] min-w-[350px] max-h-[70vh] h-[auto] min-h-[50vh] flex flex-col items-center justify-evenly auth-container bg-stone-900/40 p-8">
         {/* Box Title */}
         <div className="mb-6 text-center"> 
           <h1 className="text-white text-4xl font-bold">ChatBox Register</h1>
@@ -237,12 +237,12 @@ function Register({ onBackToLogin }: { onBackToLogin: () => void }) {
 
         {/* Back to Login */}
         <div className="mt-6 text-center text-white">
-          <span className="font-bold">Already have an account ? </span> 
+          <span className="font-bold">Already have an account ?</span> 
           <button 
             onClick={onBackToLogin} 
             className="ml-2 auth-link p-1 cursor-pointer rounded"
           >
-            Login
+          Login
           </button>
         </div>
       </div>

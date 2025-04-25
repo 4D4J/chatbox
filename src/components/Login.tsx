@@ -55,7 +55,7 @@ function Login({ onRegister }: { onRegister: () => void }) {
       {/* Fond animé */}
       <AnimatedBackground />
       
-      <div className="max-w-[35vw] w-[30vw] min-w-[350px] max-h-[70vh] h-[auto] min-h-[50vh] flex flex-col items-center justify-evenly auth-container p-8 bg-purple-900/40">
+      <div className="max-w-[35vw] w-[30vw] min-w-[350px] max-h-[70vh] h-[auto] min-h-[50vh] flex flex-col items-center justify-evenly auth-container p-8 bg-stone-900/40 ">
         {/* Box Title */}
         <div className="mb-6 text-center"> 
           <h1 className="text-white text-4xl font-bold">ChatBox Login</h1>
@@ -67,10 +67,10 @@ function Login({ onRegister }: { onRegister: () => void }) {
           </div>
         )}
 
-        <form className='p-4 w-[auto] flex flex-col items-center justify-around min-h-[25vh]' onSubmit={handleLogin}>
+        <form className='p-4 w-[auto] min-h-[25vh] flex flex-col items-center justify-around' onSubmit={handleLogin}>
           {/* Box Email */}
           <div className="flex flex-col items-center justify-evenly w-full min-h-[10vh]">
-            <label htmlFor="email" className="block text-white text-xl font-bold mb-2">Email</label>
+            <label htmlFor="email" className="block text-white text-xl font-bold">Email</label>
             <input
               id="email"  
               type="email" 
@@ -82,8 +82,8 @@ function Login({ onRegister }: { onRegister: () => void }) {
           </div>
 
           {/* Box Password */}
-          <div className="mb-8 flex flex-col items-center justify-evenly w-full min-h-[10vh]">
-            <label htmlFor="password" className="block text-white text-xl font-bold mb-2">Password</label>
+          <div className="mb-6 min-h-[10vh] flex flex-col items-center justify-evenly w-full">
+            <label htmlFor="password" className="block text-white text-xl font-bold">Password</label>
             <input
               id="password" 
               type="password" 
@@ -98,7 +98,7 @@ function Login({ onRegister }: { onRegister: () => void }) {
           <button 
             type="submit"
             disabled={!isFormValid || loading}
-            className="w-full rounded-lg font-bold text-white auth-button cursor-pointer "
+            className="w-full rounded-lg font-bold text-white auth-button cursor-pointer"
           >
             {loading ? 'Loading...' : 'Login'}
           </button>
@@ -116,12 +116,11 @@ function Login({ onRegister }: { onRegister: () => void }) {
 
         {/* Box AskToRegister */}
         <div className="mt-6 text-center text-white">
-          <span className="font-bold">Don't have an account ? </span> 
+          <span className="font-bold">Don't have an account ?</span> 
           <button 
             onClick={onRegister} 
             className="ml-2 auth-link p-1 cursor-pointer rounded"
-          >
-          Register
+          >Register
           </button>
         </div>
       </div>
