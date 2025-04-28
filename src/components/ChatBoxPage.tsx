@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { User } from '@supabase/supabase-js'
+import AnimatedBackground from './AnimatedBackground'
+import '../App.css'
 
 interface Message {
   id: number
@@ -8,6 +10,7 @@ interface Message {
   channel_id: number
   content: string
   created_at: string
+  display_name?: string
   user: {
     email: string
     user_metadata: {
@@ -153,7 +156,6 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
     };
   }, [user]);
 
-  // Ajouter la validation et assainissement des messages avant envoi
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !user) return;
     
@@ -307,8 +309,10 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
   }
 
   return (
-    <div className="w-[100vw] h-[100vh] flex flex-col bg-gray-900">
-      <div className="w-[100%] bg-gray-800 p-4 flex justify-between items-center">
+    
+    <div className="w-[100vw] h-[100vh] flex flex-col">
+      <AnimatedBackground />
+      <div className="w-[100%] bg-neutral-900 p-4 flex justify-between items-center auth-container">
 
         <h1 className="text-white text-2xl font-bold">ChatBox</h1>
 
@@ -329,9 +333,9 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
       
-      <div className="flex flex-1 p-4">
-        <div className="w-[100%] bg-gray-800 flex flex-row items-center justify-around p-4 text-white">
-            <div className='w-[20vw] h-[95%] bg-gray-700 p-4 rounded-lg shadow-md mr-4 border border-white flex flex-col'>
+      <div className="flex flex-1 p-4 ">
+        <div className="w-[100%] bg-stone-900/40 flex flex-row items-center justify-around text-white rounded-xl auth-container">
+            <div className='w-[20vw] h-[95%] bg-neutral-900/95 p-4 rounded-lg shadow-md mr-4 border border-white flex flex-col '>
                 <h2 className="text-xl font-bold mb-4 border-b pb-2">Canaux</h2>
                 <div className="flex-1 overflow-y-auto mb-4">
                     {channels.map(channel => (
@@ -355,7 +359,7 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
             </div>
 
             {/* Chat en direct */}
-            <div className='w-[65vw] h-[95%] bg-gray-800 p-4 rounded-lg shadow-md border border-white flex flex-col'>
+            <div className='w-[65vw] h-[95%] bg-neutral-900/95 p-4 rounded-lg shadow-md border border-white flex flex-col'>
                 {/* Nom du canal */}
                 <div className="pb-2 mb-4 border-b border-gray-600">
                     <h2 className="text-xl font-bold">
@@ -373,7 +377,7 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
                         messages.map((message) => (
                             <div key={message.id} className="mb-2">
                                 <span className={`font-bold ${message.user_id === user?.id ? 'text-green-400' : 'text-blue-400'}`}>
-                                    {message.user?.user_metadata?.display_name || message.user?.email?.split('@')[0] || 'Inconnu'}: 
+                                    {message.display_name || message.user?.user_metadata?.display_name || message.user?.email?.split('@')[0] || 'Inconnu'}: 
                                 </span>
                                 <span className="text-white ml-1" dangerouslySetInnerHTML={{__html: sanitizeContent(message.content)}}></span>
                             </div>
@@ -406,8 +410,8 @@ function ChatBoxPage({ onLogout }: { onLogout: () => void }) {
       {/* Paramètres du profil */}
       {showProfileSettings && (
         <div className="w-[auto] h-[auto] max-w-[100%] fixed inset-0 bg-gray-900/80 flex items-center justify-center z-50">
-          <div className="w-[20vw] h-[30vh] bg-gray-800 rounded-lg p-6 flex flex-col justify-between items-center overflow-y-auto">
-            <div className="w-[100%] h-[100%] flex justify-between items-center mb-6">
+          <div className="max-w-[40vw] w-[20vw] min-w-[300px] min-h-[50vh] max-h-[50vh] h-[100%] bg-gray-800 rounded-lg p-6 flex flex-col justify-between items-center overflow-y-auto">
+            <div className="w-[100%] h-[auto] flex justify-between items-center mb-2">
 
               <h2 className="text-white text-2xl font-bold">Paramètres du profil</h2>
 
