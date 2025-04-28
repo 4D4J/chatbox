@@ -5,7 +5,6 @@ import Login from './components/Login.tsx'
 import Register from './components/Register.tsx'
 import ChatBoxPage from './components/ChatBoxPage.tsx'
 import { supabase } from './lib/supabase.tsx'
-import { Analytics } from "@vercel/analytics/react"
 
 function App() {
   const [currentPage, setCurrentPage] = useState<'login' | 'register' | 'chat'>('login')
@@ -77,7 +76,6 @@ function App() {
 
   return (
     <>
-    <Analytics/>
       {currentPage === 'login' ? (
         <Login onRegister={() => setCurrentPage('register')} />
       ) : currentPage === 'register' ? (
