@@ -2,13 +2,12 @@
 @import "tw-animate-css";
 
 
-/* Reset sélectif au lieu de reset universel */
 body, html {
   padding: 0;
   margin: 0;
 }
 
-/* 
+
 
 /* Animations for SVG Background */
 .animated-bg-container {
@@ -98,4 +97,3 @@ body, html {
   color: #c4b5fd;
   text-decoration: underline;
 }
-
